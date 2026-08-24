@@ -10,9 +10,13 @@ pnpm test        # node:test suite, fixtures only, no network
 pnpm typecheck   # tsc --noEmit
 pnpm lint        # biome
 pnpm format      # biome, writes
+pnpm build       # single binary to dist/assetloom-app-scanner (requires bun)
+pnpm build:sea   # same via Node SEA (bigger; real Node runtime)
 ```
 
-Node 26+ runs the TypeScript sources directly — there is no build step. After editing `templates/report.html`, run `pnpm gen`.
+Node 26+ runs the TypeScript sources directly — there is no build step for development. After editing `templates/report.html`, run `pnpm gen`.
+
+The docs site: public pages live in `docs/public/` (markdown), rendered by the Astro Starlight app in `website/` (`pnpm --filter website dev`). Contributor docs live in `docs/dev/`.
 
 ## Ground rules
 

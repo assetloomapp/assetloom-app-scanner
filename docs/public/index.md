@@ -8,10 +8,6 @@ hero:
     - text: Get started
       link: ./quick-guide/
       icon: right-arrow
-    - text: Download binary
-      link: https://github.com/assetloomapp/assetloom-app-scanner/releases/latest
-      icon: download
-      variant: secondary
     - text: View on GitHub
       link: https://github.com/assetloomapp/assetloom-app-scanner
       icon: external
