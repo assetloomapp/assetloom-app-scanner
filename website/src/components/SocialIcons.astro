@@ -1,0 +1,23 @@
+---
+// Starlight has no config option for top-bar text links; overriding the
+// SocialIcons slot is the documented way to add one.
+import Default from '@astrojs/starlight/components/SocialIcons.astro';
+
+const docsUrl = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/quick-guide/`;
+---
+
+<a class="docs-link" href={docsUrl}>Docs</a>
+<Default><slot /></Default>
+
+<style>
+	.docs-link {
+		color: var(--sl-color-text-accent);
+		font-weight: 600;
+		font-size: var(--sl-text-sm);
+		text-decoration: none;
+		align-self: center;
+	}
+	.docs-link:hover {
+		color: var(--sl-color-white);
+	}
+</style>

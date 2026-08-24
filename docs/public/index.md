@@ -29,4 +29,4 @@ Employees connect SaaS and AI tools to their work Google accounts every day. Eac
 assetloom-app-scanner scan --key sa.json --impersonate admin@example.com
 ```
 
-Download the single binary for your platform from the [latest release](https://github.com/assetloomapp/assetloom-app-scanner/releases/latest) — no runtime required.
+**[Get started →](./quick-guide/)**

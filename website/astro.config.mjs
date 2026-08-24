@@ -11,6 +11,9 @@ export default defineConfig({
 			title: 'AssetLoom App Scanner',
 			description:
 				'Scan your Google Workspace for third-party OAuth app grants — AI apps, risky permissions, every user.',
+			components: {
+				SocialIcons: './src/components/SocialIcons.astro',
+			},
 			social: [
 				{
 					icon: 'github',
