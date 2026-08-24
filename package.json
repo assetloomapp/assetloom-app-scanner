@@ -1,6 +1,6 @@
 {
   "name": "assetloom-app-scanner",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Scan your IdP for third-party OAuth app grants. Find AI apps and risky permissions.",
   "keywords": [
     "oauth",
