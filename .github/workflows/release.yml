@@ -9,7 +9,11 @@ permissions:
 
 jobs:
   release:
-    runs-on: ubuntu-latest
+    # macOS runner: bun --compile injects the payload into a pre-signed bun
+    # binary, leaving a stale signature that Apple Silicon SIGKILLs on exec.
+    # The darwin binaries must be re-signed, and codesign only exists on
+    # macOS; bun cross-compiles the linux/windows targets from here fine.
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -29,6 +33,9 @@ jobs:
           for target in linux-x64 linux-arm64 darwin-x64 darwin-arm64; do
             bun build --compile --target="bun-$target" src/cli.ts \
               --outfile "dist/$target/assetloom-app-scanner"
+            case "$target" in
+              darwin-*) codesign --force --sign - "dist/$target/assetloom-app-scanner" ;;
+            esac
             tar -czf "dist/assetloom-app-scanner-$target.tar.gz" \
               -C "dist/$target" assetloom-app-scanner
           done
