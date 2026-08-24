@@ -1,0 +1,588 @@
+<!doctype html>
+<!-- Source of truth for the --html report. Open this file directly in a
+     browser to iterate on the design (it falls back to demo data while the
+     __DATA__ placeholder is present). After editing, run `pnpm gen` to
+     refresh src/html-template.generated.ts. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>AssetLoom OAuth app report</title>
+    <style>
+    :root {
+      color-scheme: light;
+      --page: #f4f4f5;
+      --bg: #ffffff;
+      --fg: #09090b;
+      --muted: #f4f4f5;
+      --muted-fg: #71717a;
+      --border: #e4e4e7;
+      --ring: #a1a1aa;
+      --radius: 10px;
+      --red: #dc2626;
+      --red-bg: #fef2f2;
+      --amber: #b45309;
+      --amber-bg: #fffbeb;
+      --green: #15803d;
+      --green-bg: #f0fdf4;
+    }
+
+    /* dark tokens twice: as the explicit override and as the system default
+       when no choice was stored — CSS offers no way to share the block */
+    :root[data-theme="dark"] {
+      color-scheme: dark;
+      --page: #09090b;
+      --bg: #18181b;
+      --fg: #fafafa;
+      --muted: #27272a;
+      --muted-fg: #a1a1aa;
+      --border: #27272a;
+      --ring: #52525b;
+      --red: #f87171;
+      --red-bg: #450a0a;
+      --amber: #fbbf24;
+      --amber-bg: #451a03;
+      --green: #4ade80;
+      --green-bg: #052e16;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        color-scheme: dark;
+        --page: #09090b;
+        --bg: #18181b;
+        --fg: #fafafa;
+        --muted: #27272a;
+        --muted-fg: #a1a1aa;
+        --border: #27272a;
+        --ring: #52525b;
+        --red: #f87171;
+        --red-bg: #450a0a;
+        --amber: #fbbf24;
+        --amber-bg: #451a03;
+        --green: #4ade80;
+        --green-bg: #052e16;
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--page);
+      color: var(--fg);
+      font:
+        14px / 1.5 ui-sans-serif,
+        system-ui,
+        -apple-system,
+        "Segoe UI",
+        sans-serif;
+    }
+
+    .wrap {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 32px 20px;
+    }
+
+    h1 {
+      font-size: 20px;
+      font-weight: 600;
+      margin: 0;
+    }
+
+    .head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .btn {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 10px;
+      font: inherit;
+      color: inherit;
+      cursor: pointer;
+    }
+
+    .btn:hover {
+      background: var(--muted);
+    }
+
+    .sub {
+      color: var(--muted-fg);
+      margin: 4px 0 24px;
+      font-size: 13px;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+    }
+
+    .card .label {
+      font-size: 12px;
+      color: var(--muted-fg);
+    }
+
+    .card .value {
+      font-size: 24px;
+      font-weight: 600;
+      margin-top: 2px;
+    }
+
+    .card.danger .value {
+      color: var(--red);
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    input[type="search"],
+    select {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font: inherit;
+      color: inherit;
+      outline: none;
+    }
+
+    input[type="search"] {
+      flex: 1;
+    }
+
+    input[type="search"]:focus,
+    select:focus {
+      border-color: var(--ring);
+      box-shadow: 0 0 0 3px rgba(161, 161, 170, 0.25);
+    }
+
+    .panel {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th,
+    td {
+      text-align: left;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    th {
+      font-weight: 500;
+      color: var(--muted-fg);
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }
+
+    th:hover {
+      color: var(--fg);
+    }
+
+    td.num,
+    th.num {
+      text-align: right;
+    }
+
+    /* (i) button + click popover explaining the Source values */
+    .info {
+      border: 0;
+      background: none;
+      padding: 0 2px;
+      font: inherit;
+      color: var(--muted-fg);
+      cursor: pointer;
+    }
+
+    .info:hover {
+      color: var(--fg);
+    }
+
+    .pop {
+      position: absolute;
+      top: 100%;
+      right: 0;
+      z-index: 1;
+      width: 300px;
+      padding: 10px 12px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--fg);
+      font-weight: 400;
+      white-space: normal;
+      text-align: left;
+      cursor: auto;
+      user-select: text;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .pop p {
+      margin: 0 0 8px;
+    }
+
+    .pop p:last-child {
+      margin-bottom: 0;
+    }
+
+    tbody tr:hover {
+      background: var(--muted);
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 500;
+      background: var(--muted);
+      color: var(--muted-fg);
+    }
+
+    .badge.high {
+      background: var(--red-bg);
+      color: var(--red);
+    }
+
+    .badge.medium {
+      background: var(--amber-bg);
+      color: var(--amber);
+    }
+
+    .badge.low {
+      background: var(--green-bg);
+      color: var(--green);
+    }
+
+    .empty {
+      padding: 32px;
+      text-align: center;
+      color: var(--muted-fg);
+    }
+
+    footer {
+      margin-top: 16px;
+      color: var(--muted-fg);
+      font-size: 12px;
+      text-align: center;
+    }
+
+    footer a {
+      color: inherit;
+    }
+    </style>
+  </head>
+
+  <body>
+    <div class="wrap">
+      <div class="head">
+        <h1>Third-party OAuth app report</h1>
+        <button
+          type="button"
+          id="theme"
+          class="btn"
+          title="Toggle light/dark theme"
+        >
+          ☾
+        </button>
+      </div>
+      <p class="sub" id="sub">
+        __SUBTITLE__ ·
+        <time id="generated" datetime="__GENERATED_AT__">__GENERATED_AT__</time>
+      </p>
+      <div class="cards">
+        <div class="card">
+          <div class="label">Users scanned</div>
+          <div class="value" id="v-users">__USERS__</div>
+        </div>
+        <div class="card">
+          <div class="label">Grants</div>
+          <div class="value" id="v-grants">__GRANTS__</div>
+        </div>
+        <div class="card">
+          <div class="label">Apps</div>
+          <div class="value" id="v-apps">__APPS__</div>
+        </div>
+        <div class="card danger">
+          <div class="label">Unverified high-risk</div>
+          <div class="value" id="v-risky">__RISKY__</div>
+        </div>
+      </div>
+      <div class="toolbar">
+        <input type="search" id="q" placeholder="Search apps...">
+        <select id="risk">
+          <option value="">All risk levels</option>
+          <option value="high">High</option>
+          <option value="medium">Medium</option>
+          <option value="low">Low</option>
+        </select>
+      </div>
+      <div class="panel">
+        <table>
+          <thead>
+            <tr>
+              <th data-key="display_name">App</th>
+              <th data-key="category">Category</th>
+              <th data-key="risk_level">Risk</th>
+              <th data-key="classified_by" style="position: relative">
+                Source
+                <button
+                  type="button"
+                  id="src-info"
+                  class="info"
+                  aria-label="What does Source mean?"
+                >
+                  ⓘ
+                </button>
+                <div id="src-pop" class="pop" hidden></div>
+              </th>
+              <th data-key="user_count" class="num">Users</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <footer>
+        Generated by
+        <a href="https://assetloomapp.github.io/assetloom-app-scanner/"
+          >AssetLoom App Scanner</a
+        >
+        — this file is self-contained; the data never left your machine.
+      </footer>
+    </div>
+    <script id="data" type="application/json">
+    "__DATA__"
+    </script>
+    <script>
+    var DATA = JSON.parse(document.getElementById("data").textContent);
+    if (!Array.isArray(DATA)) {
+      // placeholder still present: the template was opened directly, show demo data
+      DATA = [
+        {
+          client_id: "demo-1",
+          display_name: "ChatGPT",
+          category: "ai",
+          risk_level: "low",
+          classified_by: "name",
+          user_count: 70,
+        },
+        {
+          client_id: "demo-2",
+          display_name: "Random Tool",
+          category: "unknown",
+          risk_level: "high",
+          classified_by: "unknown",
+          user_count: 12,
+        },
+        {
+          client_id: "demo-3",
+          display_name: "Zoom",
+          category: "communication",
+          risk_level: "medium",
+          classified_by: "name",
+          user_count: 25,
+        },
+        {
+          client_id: "demo-4",
+          display_name: "Dropbox",
+          category: "storage",
+          risk_level: "medium",
+          classified_by: "name",
+          user_count: 8,
+        },
+      ];
+      document.getElementById("sub").textContent =
+        "demo data — template preview, run a scan for the real thing";
+      document.getElementById("v-users").textContent = "101";
+      document.getElementById("v-grants").textContent = "1871";
+      document.getElementById("v-apps").textContent = String(DATA.length);
+      document.getElementById("v-risky").textContent = "1";
+    }
+    var SRC_HELP = {
+      catalog:
+        "OAuth client ID matched our verified catalog. Client IDs are issued by the provider and cannot be forged, so this is the only trusted identification.",
+      name: 'Display name matched a known pattern (e.g. "chatgpt" → ai). Names are chosen by the app itself, so this is a cosmetic hint, not a trust decision.',
+      unknown: "No catalog or name match — the app could not be categorized.",
+    };
+    var ORDER = { low: 0, medium: 1, high: 2 };
+    var state = { q: "", risk: "", key: "user_count", dir: -1 };
+
+    function view() {
+      var q = state.q.toLowerCase();
+      var rows = DATA.filter((r) => {
+        if (state.risk && r.risk_level !== state.risk) return false;
+        return (
+          !q ||
+          r.display_name.toLowerCase().includes(q) ||
+          r.category.includes(q) ||
+          r.client_id.toLowerCase().includes(q)
+        );
+      });
+      rows.sort((a, b) => {
+        var va = a[state.key],
+          vb = b[state.key];
+        if (state.key === "risk_level") {
+          va = ORDER[va];
+          vb = ORDER[vb];
+        }
+        if (va < vb) return -state.dir;
+        if (va > vb) return state.dir;
+        return 0;
+      });
+      return rows;
+    }
+
+    function render() {
+      var tbody = document.getElementById("rows");
+      tbody.textContent = "";
+      var rows = view();
+      if (!rows.length) {
+        const tr = document.createElement("tr");
+        const td = document.createElement("td");
+        td.colSpan = 5;
+        td.className = "empty";
+        td.textContent = "No apps match.";
+        tr.appendChild(td);
+        tbody.appendChild(tr);
+        return;
+      }
+      rows.forEach((r) => {
+        var tr = document.createElement("tr");
+        var name = document.createElement("td");
+        name.textContent = r.display_name;
+        name.title = r.client_id;
+        tr.appendChild(name);
+        var cat = document.createElement("td");
+        var catBadge = document.createElement("span");
+        catBadge.className = "badge";
+        catBadge.textContent = r.category;
+        cat.appendChild(catBadge);
+        tr.appendChild(cat);
+        var risk = document.createElement("td");
+        var riskBadge = document.createElement("span");
+        riskBadge.className = `badge ${r.risk_level}`;
+        riskBadge.textContent = r.risk_level;
+        risk.appendChild(riskBadge);
+        tr.appendChild(risk);
+        var src = document.createElement("td");
+        src.textContent = r.classified_by;
+        src.title = SRC_HELP[r.classified_by] || "";
+        tr.appendChild(src);
+        var users = document.createElement("td");
+        users.className = "num";
+        users.textContent = String(r.user_count);
+        tr.appendChild(users);
+        tbody.appendChild(tr);
+      });
+    }
+
+    document.getElementById("q").addEventListener("input", (e) => {
+      state.q = e.target.value;
+      render();
+    });
+    document.getElementById("risk").addEventListener("change", (e) => {
+      state.risk = e.target.value;
+      render();
+    });
+    document.querySelectorAll("th[data-key]").forEach((th) => {
+      th.addEventListener("click", () => {
+        var key = th.getAttribute("data-key");
+        if (state.key === key) state.dir = -state.dir;
+        else {
+          state.key = key;
+          state.dir = key === "user_count" ? -1 : 1;
+        }
+        render();
+      });
+    });
+    render();
+
+    // (i) popover: built from SRC_HELP so the copy lives in one place
+    var srcPop = document.getElementById("src-pop");
+    Object.keys(SRC_HELP).forEach((k) => {
+      var p = document.createElement("p");
+      var b = document.createElement("b");
+      b.textContent = k;
+      p.appendChild(b);
+      p.appendChild(document.createTextNode(` — ${SRC_HELP[k]}`));
+      srcPop.appendChild(p);
+    });
+    document.getElementById("src-info").addEventListener("click", (e) => {
+      e.stopPropagation(); // the header click sorts; the icon must not
+      srcPop.hidden = !srcPop.hidden;
+    });
+    srcPop.addEventListener("click", (e) => e.stopPropagation());
+    document.addEventListener("click", () => {
+      srcPop.hidden = true;
+    });
+
+    // show the UTC generation timestamp in the viewer's local time
+    // (demo mode replaced #sub entirely, so the element may be gone)
+    var timeEl = document.getElementById("generated");
+    if (timeEl) {
+      const when = new Date(timeEl.getAttribute("datetime"));
+      if (!Number.isNaN(when.getTime()))
+        timeEl.textContent = when.toLocaleString();
+    }
+
+    // theme: follow system until the user picks one; the choice persists
+    var themeBtn = document.getElementById("theme");
+    var darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    var storedTheme = null;
+    try {
+      storedTheme = localStorage.getItem("assetloom-theme");
+    } catch (e) {
+      /* localStorage can be unavailable on file:// in some browsers */
+    }
+    function applyTheme() {
+      if (storedTheme) document.documentElement.dataset.theme = storedTheme;
+      var dark = storedTheme ? storedTheme === "dark" : darkQuery.matches;
+      themeBtn.textContent = dark ? "☀" : "☾";
+    }
+    themeBtn.addEventListener("click", () => {
+      var dark = storedTheme ? storedTheme === "dark" : darkQuery.matches;
+      storedTheme = dark ? "light" : "dark";
+      try {
+        localStorage.setItem("assetloom-theme", storedTheme);
+      } catch (e) {
+        /* non-persistent toggle is fine */
+      }
+      applyTheme();
+    });
+    darkQuery.addEventListener("change", applyTheme);
+    applyTheme();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "u1": {
+    "items": [
+      {
+        "clientId": "111.apps.googleusercontent.com",
+        "displayText": "ChatGPT",
+        "scopes": ["openid", "https://www.googleapis.com/auth/drive.readonly"]
+      },
+      {
+        "clientId": "222.apps.googleusercontent.com",
+        "displayText": "Random Tool",
+        "scopes": ["https://www.googleapis.com/auth/drive"]
+      }
+    ]
+  },
+  "u2": {}
+}

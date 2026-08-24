@@ -1,0 +1,46 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: pnpm
+      - uses: oven-sh/setup-bun@v2
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm gen
+      - name: Build binaries
+        # one archive per platform; tar.gz/zip keep the executable bit, which
+        # a raw binary asset loses on download (HTTP carries no permissions)
+        run: |
+          for target in linux-x64 linux-arm64 darwin-x64 darwin-arm64; do
+            bun build --compile --target="bun-$target" src/cli.ts \
+              --outfile "dist/$target/assetloom-app-scanner"
+            tar -czf "dist/assetloom-app-scanner-$target.tar.gz" \
+              -C "dist/$target" assetloom-app-scanner
+          done
+          bun build --compile --target=bun-windows-x64 src/cli.ts \
+            --outfile dist/windows-x64/assetloom-app-scanner.exe
+          zip -q -j dist/assetloom-app-scanner-windows-x64.zip \
+            dist/windows-x64/assetloom-app-scanner.exe
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            dist/assetloom-app-scanner-*.tar.gz \
+            dist/assetloom-app-scanner-*.zip \
+            --generate-notes

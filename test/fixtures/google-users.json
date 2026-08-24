@@ -1,0 +1,12 @@
+[
+  {
+    "users": [
+      { "id": "u1", "primaryEmail": "alice@example.com" },
+      { "id": "u2", "primaryEmail": "bob@example.com" }
+    ],
+    "nextPageToken": "page2"
+  },
+  {
+    "users": [{ "id": "u3", "primaryEmail": "carol@example.com" }]
+  }
+]
