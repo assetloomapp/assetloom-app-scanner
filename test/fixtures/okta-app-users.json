@@ -1,0 +1,26 @@
+{
+  "app1": [
+    [
+      {
+        "id": "u1",
+        "scope": "USER",
+        "credentials": { "userName": "alice@example.com" }
+      },
+      {
+        "id": "u2",
+        "scope": "GROUP",
+        "credentials": { "userName": "bob@example.com" }
+      }
+    ]
+  ],
+  "app2": [
+    [
+      {
+        "id": "u1",
+        "scope": "USER",
+        "credentials": { "userName": "alice@example.com" }
+      }
+    ],
+    [{ "id": "u3", "scope": "GROUP" }]
+  ]
+}

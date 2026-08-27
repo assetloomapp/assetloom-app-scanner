@@ -1,8 +1,25 @@
 #!/usr/bin/env node
-import { mkdirSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
+import { homedir } from "node:os";
+import { dirname, join } from "node:path";
+import { createInterface } from "node:readline/promises";
 import { parseArgs, styleText } from "node:util";
 import pkg from "../package.json" with { type: "json" };
 import { createDirectory, scanDirectory } from "./connectors/google.ts";
+import {
+  adminTokenUrl,
+  createOktaClient,
+  normalizeOrgUrl,
+  oktaClient,
+  scanOkta,
+} from "./connectors/okta.ts";
+import type { ScanResult } from "./connectors/types.ts";
 import { renderHtml } from "./html.ts";
 import { log, setLogLevel } from "./log.ts";
 import { buildReport, type ReportRow, toCsv } from "./report.ts";
@@ -17,10 +34,34 @@ type OptionSpec = {
 
 type Values = Record<string, string | boolean | undefined>;
 
+const KEY_DIR = "~/.assetloom-scanner";
+
+function expandHome(p: string): string {
+  return p.startsWith("~/") ? join(homedir(), p.slice(2)) : p;
+}
+
 const GLOBAL_OPTIONS: Record<string, OptionSpec> = {
   verbose: { type: "boolean", desc: "show debug output" },
   quiet: { type: "boolean", desc: "only show errors" },
   help: { type: "boolean", desc: "show help" },
+};
+
+const OUTPUT_OPTIONS: Record<string, OptionSpec> = {
+  ai: { type: "boolean", desc: "AI apps only" },
+  user: {
+    type: "string",
+    desc: "filter to one user",
+    placeholder: "<email>",
+  },
+  json: { type: "boolean", desc: "print JSON to stdout" },
+  csv: {
+    type: "boolean",
+    desc: "write CSV to ./data/reports/ instead of printing",
+  },
+  html: {
+    type: "boolean",
+    desc: "write a self-contained HTML report to ./data/reports/",
+  },
 };
 
 const COMMANDS: Record<
@@ -37,7 +78,7 @@ const COMMANDS: Record<
       key: {
         type: "string",
         desc: "service account JSON key file",
-        required: true,
+        default: `${KEY_DIR}/google.json`,
         placeholder: "<sa.json>",
       },
       impersonate: {
@@ -51,31 +92,30 @@ const COMMANDS: Record<
         desc: "limit scan to one domain",
         placeholder: "<domain>",
       },
-      ai: { type: "boolean", desc: "AI apps only" },
       risky: {
         type: "boolean",
         desc: "unverified apps holding high-risk scopes",
       },
-      user: {
-        type: "string",
-        desc: "filter to one user",
-        placeholder: "<email>",
-      },
-      json: { type: "boolean", desc: "print JSON to stdout" },
-      csv: {
-        type: "boolean",
-        desc: "write CSV to ./data/reports/ instead of printing",
-      },
-      html: {
-        type: "boolean",
-        desc: "write a self-contained HTML report to ./data/reports/",
-      },
+      ...OUTPUT_OPTIONS,
       "fail-on-risky": {
         type: "boolean",
         desc: "exit 2 if any unverified high-risk apps exist",
       },
     },
-    run: scanCmd,
+    run: googleCmd,
+  },
+  okta: {
+    desc: "Scan Okta for SSO app assignments",
+    options: {
+      key: {
+        type: "string",
+        desc: "credentials JSON file, created by 'config okta'",
+        default: `${KEY_DIR}/okta.json`,
+        placeholder: "<okta.json>",
+      },
+      ...OUTPUT_OPTIONS,
+    },
+    run: oktaCmd,
   },
   entra: {
     desc: "Scan Microsoft Entra ID (not yet implemented)",
@@ -84,12 +124,15 @@ const COMMANDS: Record<
       throw new Error("the entra connector is not implemented yet");
     },
   },
-  okta: {
-    desc: "Scan Okta (not yet implemented)",
+  "config okta": {
+    desc: "Interactively create the okta credentials file for --key",
     options: {},
-    run: () => {
-      throw new Error("the okta connector is not implemented yet");
-    },
+    run: configOktaCmd,
+  },
+  "config google": {
+    desc: "Validate a downloaded service account key and install it for --key",
+    options: {},
+    run: configGoogleCmd,
   },
 };
 
@@ -184,19 +227,227 @@ function printTable(rows: ReportRow[]): void {
   }
 }
 
-async function scanCmd(v: Values): Promise<void> {
-  const outputs = ["json", "csv", "html"].filter((o) => v[o]);
-  if (outputs.length > 1)
-    fail(`--${outputs.join(" and --")} are mutually exclusive`, "google");
+function keyFile(v: Values, command: string, hint: string): string {
+  const key = expandHome(v.key as string);
+  if (!existsSync(key)) fail(`key file not found: ${key} — ${hint}`, command);
+  return key;
+}
 
-  const dir = createDirectory(v.key as string, v.impersonate as string);
+async function googleCmd(v: Values): Promise<void> {
+  checkOutputFlags(v, "google");
+  const key = keyFile(
+    v,
+    "google",
+    "save your service account key there or pass --key",
+  );
+  const dir = createDirectory(key, v.impersonate as string);
   log.info(`Fetching users from Google Workspace as ${v.impersonate}...`);
   const result = await scanDirectory(dir, {
     domain: v.domain as string | undefined,
     log: (msg) => log.warn(msg),
     progress: v.quiet ? undefined : progressRenderer(),
   });
+  report(v, result, "google");
+}
 
+async function oktaCmd(v: Values): Promise<void> {
+  checkOutputFlags(v, "okta");
+  const client = createOktaClient(
+    keyFile(v, "okta", "run 'assetloom-app-scanner config okta' or pass --key"),
+  );
+  log.info("Fetching apps from Okta...");
+  const result = await scanOkta(client, {
+    log: (msg) => log.warn(msg),
+    progress: v.quiet ? undefined : progressRenderer(),
+  });
+  report(v, result, "okta");
+}
+
+/** Read the token on a TTY without echoing it (tokens stay off the screen). */
+function askSecretTty(question: string): Promise<string> {
+  return new Promise((resolve) => {
+    process.stderr.write(question);
+    process.stdin.setRawMode(true);
+    process.stdin.resume();
+    process.stdin.setEncoding("utf8");
+    let buf = "";
+    const onData = (ch: string) => {
+      if (ch === "\r" || ch === "\n") {
+        process.stdin.setRawMode(false);
+        process.stdin.pause();
+        process.stdin.off("data", onData);
+        process.stderr.write("\n");
+        resolve(buf.trim());
+      } else if (ch === "\u0003") {
+        process.stderr.write("\n");
+        process.exit(130);
+      } else if (ch === "\u007f") {
+        buf = buf.slice(0, -1);
+      } else {
+        buf += ch;
+      }
+    };
+    process.stdin.on("data", onData);
+  });
+}
+
+/**
+ * Line-based prompt on stderr (stdout stays clean for command results).
+ * Lines are buffered from the start: with piped stdin, answers can all
+ * arrive in one chunk before the second question is even asked.
+ */
+function lineReader() {
+  const rl = createInterface({ input: process.stdin });
+  const lines: string[] = [];
+  const waiters: Array<(s: string) => void> = [];
+  rl.on("line", (l) => {
+    const w = waiters.shift();
+    if (w) w(l);
+    else lines.push(l);
+  });
+  rl.on("close", () => {
+    for (const w of waiters.splice(0)) w("");
+  });
+  return {
+    question(prompt: string): Promise<string> {
+      process.stderr.write(prompt);
+      const l = lines.shift();
+      if (l !== undefined) return Promise.resolve(l);
+      return new Promise((r) => waiters.push(r));
+    },
+    close: () => rl.close(),
+  };
+}
+
+async function configOktaCmd(_v: Values): Promise<void> {
+  let rl = lineReader();
+  try {
+    const orgInput = await rl.question(
+      "Okta org URL or subdomain (e.g. acme, https://acme.okta.com): ",
+    );
+    const org = normalizeOrgUrl(orgInput.trim());
+    log.info(`Org URL: ${org}`);
+    log.info("Create an API token (read-only admin is enough) at:");
+    log.info(`  ${adminTokenUrl(org)}`);
+    let token: string;
+    if (process.stdin.isTTY) {
+      // raw-mode read needs stdin to itself; reopen a reader afterwards
+      // (interactive input has no buffered lines to lose)
+      rl.close();
+      token = await askSecretTty("Paste the API token: ");
+      rl = lineReader();
+    } else {
+      token = (await rl.question("Paste the API token: ")).trim();
+    }
+    if (!token) fail("no token provided", "config okta");
+    log.info("Verifying the token...");
+    try {
+      await oktaClient(org, token).get("/api/v1/apps?limit=1");
+    } catch (err) {
+      const status = (err as { status?: number }).status;
+      if (status === 401)
+        throw new Error(
+          `${org} rejected the token (401). Check that it was pasted in full and has not expired or been revoked, and that the org URL is yours.`,
+        );
+      if (status === 403)
+        throw new Error(
+          `${org} accepted the token but refused to list apps (403). The token inherits its creator's permissions — create it as an admin with read access to applications.`,
+        );
+      throw err;
+    }
+    log.info("Token works.");
+    let out = expandHome(
+      (
+        await rl.question(`Save credentials to [${KEY_DIR}/okta.json]: `)
+      ).trim() || `${KEY_DIR}/okta.json`,
+    );
+    if (existsSync(out) && statSync(out).isDirectory())
+      out = join(out, "okta.json");
+    await confirmOverwrite(rl, out);
+    mkdirSync(dirname(out), { recursive: true });
+    writeFileSync(out, `${JSON.stringify({ org, token }, null, 2)}\n`, {
+      mode: 0o600,
+    });
+    console.log(out);
+    log.info(`Scan with: assetloom-app-scanner okta --key ${out}`);
+  } finally {
+    rl.close();
+  }
+}
+
+/** Exits unless the user confirms overwriting an existing file (default no). */
+async function confirmOverwrite(
+  rl: ReturnType<typeof lineReader>,
+  out: string,
+): Promise<void> {
+  if (!existsSync(out)) return;
+  const yn = (
+    await rl.question(`${out} already exists. Overwrite? (y/N): `)
+  ).trim();
+  if (!/^y(es)?$/i.test(yn)) {
+    log.error(`not overwriting ${out}`);
+    process.exit(1);
+  }
+}
+
+async function configGoogleCmd(_v: Values): Promise<void> {
+  const rl = lineReader();
+  try {
+    log.info(
+      "Create a service account and download its JSON key by following:",
+    );
+    log.info(
+      "  https://assetloomapp.github.io/assetloom-app-scanner/setup/google-workspace/",
+    );
+    const src = expandHome(
+      (
+        await rl.question("Path to the downloaded service account JSON key: ")
+      ).trim(),
+    );
+    if (!src || !existsSync(src)) fail(`no file at ${src}`, "config google");
+    let key: { type?: string; client_email?: string; private_key?: string };
+    try {
+      key = JSON.parse(readFileSync(src, "utf8"));
+    } catch {
+      fail(`${src} is not valid JSON`, "config google");
+    }
+    if (key.type !== "service_account" || !key.client_email || !key.private_key)
+      fail(
+        `${src} is not a service account key — expected type "service_account" with client_email and private_key. Make sure you downloaded the key from the service account's Keys tab, not an OAuth client.`,
+        "config google",
+      );
+    log.info(`Key looks valid (service account: ${key.client_email}).`);
+    const dest = expandHome(`${KEY_DIR}/google.json`);
+    const yn = (
+      await rl.question(
+        `Copy it to ${KEY_DIR}/google.json so scans can omit --key? (Y/n): `,
+      )
+    ).trim();
+    if (/^n(o)?$/i.test(yn)) {
+      log.info(
+        `Scan with: assetloom-app-scanner google --key ${src} --impersonate admin@yourdomain.com`,
+      );
+      return;
+    }
+    await confirmOverwrite(rl, dest);
+    mkdirSync(dirname(dest), { recursive: true });
+    writeFileSync(dest, readFileSync(src), { mode: 0o600 });
+    console.log(dest);
+    log.info(
+      "Scan with: assetloom-app-scanner google --impersonate admin@yourdomain.com",
+    );
+  } finally {
+    rl.close();
+  }
+}
+
+function checkOutputFlags(v: Values, command: string): void {
+  const outputs = ["json", "csv", "html"].filter((o) => v[o]);
+  if (outputs.length > 1)
+    fail(`--${outputs.join(" and --")} are mutually exclusive`, command);
+}
+
+function report(v: Values, result: ScanResult, connector: string): void {
   const rows = buildReport(result.grants, {
     ai: v.ai as boolean,
     risky: v.risky as boolean,
@@ -230,7 +481,7 @@ async function scanCmd(v: Values): Promise<void> {
     writeReport(
       "html",
       renderHtml(rows, {
-        connector: "google",
+        connector,
         generatedAt: new Date().toISOString(),
         usersScanned: result.users.length,
         grantCount: result.grants.length,
@@ -250,7 +501,12 @@ async function scanCmd(v: Values): Promise<void> {
   if (v["fail-on-risky"] && riskyCount) process.exit(2);
 }
 
-const [command, ...rest] = process.argv.slice(2);
+let [command, ...rest] = process.argv.slice(2);
+// two-word commands like "config okta"
+if (!COMMANDS[command] && COMMANDS[`${command} ${rest[0]}`]) {
+  command = `${command} ${rest[0]}`;
+  rest = rest.slice(1);
+}
 
 if (!command) fail("missing command");
 if (command === "help" || command === "--help" || command === "-h") {
