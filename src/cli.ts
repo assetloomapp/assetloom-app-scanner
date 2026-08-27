@@ -31,15 +31,9 @@ const COMMANDS: Record<
     run: (v: Values) => Promise<void> | void;
   }
 > = {
-  scan: {
-    desc: "Scan your IdP for third-party OAuth app grants and report them",
+  google: {
+    desc: "Scan Google Workspace for third-party OAuth app grants",
     options: {
-      connector: {
-        type: "string",
-        desc: "identity provider to scan",
-        default: "google",
-        placeholder: "<name>",
-      },
       key: {
         type: "string",
         desc: "service account JSON key file",
@@ -82,6 +76,20 @@ const COMMANDS: Record<
       },
     },
     run: scanCmd,
+  },
+  entra: {
+    desc: "Scan Microsoft Entra ID (not yet implemented)",
+    options: {},
+    run: () => {
+      throw new Error("the entra connector is not implemented yet");
+    },
+  },
+  okta: {
+    desc: "Scan Okta (not yet implemented)",
+    options: {},
+    run: () => {
+      throw new Error("the okta connector is not implemented yet");
+    },
   },
 };
 
@@ -179,10 +187,7 @@ function printTable(rows: ReportRow[]): void {
 async function scanCmd(v: Values): Promise<void> {
   const outputs = ["json", "csv", "html"].filter((o) => v[o]);
   if (outputs.length > 1)
-    fail(`--${outputs.join(" and --")} are mutually exclusive`, "scan");
-  const connector = v.connector as string;
-  if (connector !== "google")
-    fail(`unknown connector: ${connector} (available: google)`, "scan");
+    fail(`--${outputs.join(" and --")} are mutually exclusive`, "google");
 
   const dir = createDirectory(v.key as string, v.impersonate as string);
   log.info(`Fetching users from Google Workspace as ${v.impersonate}...`);
@@ -225,7 +230,7 @@ async function scanCmd(v: Values): Promise<void> {
     writeReport(
       "html",
       renderHtml(rows, {
-        connector,
+        connector: "google",
         generatedAt: new Date().toISOString(),
         usersScanned: result.users.length,
         grantCount: result.grants.length,

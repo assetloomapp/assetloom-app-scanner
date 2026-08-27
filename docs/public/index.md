@@ -26,7 +26,7 @@ Employees connect SaaS and AI tools to their work Google accounts every day. Eac
 - **Your data stays yours** — results are never persisted or sent anywhere; the only network calls are to Google's Admin SDK.
 
 ```bash
-assetloom-app-scanner scan --key sa.json --impersonate admin@example.com
+assetloom-app-scanner google --key sa.json --impersonate admin@example.com
 ```
 
 **[Get started →](./quick-guide/)**
