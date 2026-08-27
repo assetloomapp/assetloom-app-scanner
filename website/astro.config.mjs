@@ -24,7 +24,7 @@ export default defineConfig({
 			sidebar: [
 				{ label: 'Quick Guide', slug: 'quick-guide' },
 				{ label: 'Installation', slug: 'installation' },
-				{ label: 'Setup', items: ['setup/google-workspace'] },
+				{ label: 'Setup', items: ['setup/google-workspace', 'setup/okta'] },
 				{
 					label: 'How it works',
 					items: [
