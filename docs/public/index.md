@@ -6,7 +6,9 @@ hero:
   tagline: Find every third-party app your users granted OAuth access to — which AI tools are in use, and which unknown apps hold dangerous permissions like full Gmail or Drive access. Nothing is stored; results live only in your terminal.
   actions:
     - text: Get started
-      link: ./quick-guide/
+      # frontmatter links are emitted verbatim (no base rewriting), so the
+      # site base must be included here, unlike markdown body links
+      link: /assetloom-app-scanner/quick-guide/
       icon: right-arrow
     - text: View on GitHub
       link: https://github.com/assetloomapp/assetloom-app-scanner
@@ -29,4 +31,4 @@ Employees connect SaaS and AI tools to their work Google accounts every day. Eac
 assetloom-app-scanner google --key sa.json --impersonate admin@example.com
 ```
 
-**[Get started →](./quick-guide/)**
+**[Get started →](/assetloom-app-scanner/quick-guide/)**
