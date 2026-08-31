@@ -4,8 +4,7 @@ import starlight from '@astrojs/starlight';
 
 // https://astro.build/config
 export default defineConfig({
-	site: 'https://assetloomapp.github.io',
-	base: '/assetloom-app-scanner',
+	site: 'https://docs.shadow-it-discovery.com',
 	integrations: [
 		starlight({
 			title: 'AssetLoom App Scanner',
