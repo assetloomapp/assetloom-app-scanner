@@ -11,6 +11,11 @@ import { dirname, join } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { parseArgs, styleText } from "node:util";
 import pkg from "../package.json" with { type: "json" };
+import {
+  createEntraClient,
+  entraClient,
+  scanEntra,
+} from "./connectors/entra.ts";
 import { createDirectory, scanDirectory } from "./connectors/google.ts";
 import {
   adminTokenUrl,
@@ -118,11 +123,25 @@ const COMMANDS: Record<
     run: oktaCmd,
   },
   entra: {
-    desc: "Scan Microsoft Entra ID (not yet implemented)",
-    options: {},
-    run: () => {
-      throw new Error("the entra connector is not implemented yet");
+    desc: "Scan Microsoft Entra ID for delegated OAuth app grants",
+    options: {
+      key: {
+        type: "string",
+        desc: "credentials JSON file, created by 'config entra'",
+        default: `${KEY_DIR}/entra.json`,
+        placeholder: "<entra.json>",
+      },
+      risky: {
+        type: "boolean",
+        desc: "unverified apps holding high-risk scopes",
+      },
+      ...OUTPUT_OPTIONS,
+      "fail-on-risky": {
+        type: "boolean",
+        desc: "exit 2 if any unverified high-risk apps exist",
+      },
     },
+    run: entraCmd,
   },
   "config okta": {
     desc: "Interactively create the okta credentials file for --key",
@@ -133,6 +152,11 @@ const COMMANDS: Record<
     desc: "Validate a downloaded service account key and install it for --key",
     options: {},
     run: configGoogleCmd,
+  },
+  "config entra": {
+    desc: "Interactively create the entra credentials file for --key",
+    options: {},
+    run: configEntraCmd,
   },
 };
 
@@ -267,6 +291,23 @@ async function oktaCmd(v: Values): Promise<void> {
   report(v, result, "okta");
 }
 
+async function entraCmd(v: Values): Promise<void> {
+  checkOutputFlags(v, "entra");
+  const client = createEntraClient(
+    keyFile(
+      v,
+      "entra",
+      "run 'assetloom-app-scanner config entra' or pass --key",
+    ),
+  );
+  log.info("Fetching OAuth grants from Microsoft Entra ID...");
+  const result = await scanEntra(client, {
+    log: scanLog,
+    progress: v.quiet ? undefined : progressRenderer(),
+  });
+  report(v, result, "entra");
+}
+
 /** Read the token on a TTY without echoing it (tokens stay off the screen). */
 function askSecretTty(question: string): Promise<string> {
   return new Promise((resolve) => {
@@ -374,6 +415,69 @@ async function configOktaCmd(_v: Values): Promise<void> {
     });
     console.log(out);
     log.info(`Scan with: assetloom-app-scanner okta --key ${out}`);
+  } finally {
+    rl.close();
+  }
+}
+
+async function configEntraCmd(_v: Values): Promise<void> {
+  let rl = lineReader();
+  try {
+    log.info(
+      "Register an app with the Microsoft Graph Directory.Read.All application permission by following:",
+    );
+    log.info(
+      "  https://assetloomapp.github.io/assetloom-app-scanner/setup/entra/",
+    );
+    const tenant = (
+      await rl.question(
+        "Tenant ID (or primary domain, e.g. contoso.onmicrosoft.com): ",
+      )
+    ).trim();
+    if (!tenant) fail("no tenant provided", "config entra");
+    const clientId = (await rl.question("Application (client) ID: ")).trim();
+    if (!clientId) fail("no client ID provided", "config entra");
+    let clientSecret: string;
+    if (process.stdin.isTTY) {
+      // raw-mode read needs stdin to itself; reopen a reader afterwards
+      rl.close();
+      clientSecret = await askSecretTty("Paste the client secret value: ");
+      rl = lineReader();
+    } else {
+      clientSecret = (
+        await rl.question("Paste the client secret value: ")
+      ).trim();
+    }
+    if (!clientSecret) fail("no client secret provided", "config entra");
+    const key = { tenant, clientId, clientSecret };
+    log.info("Verifying the credentials...");
+    try {
+      await entraClient(key).get("/v1.0/servicePrincipals?$top=1");
+    } catch (err) {
+      const status = (err as { status?: number }).status;
+      if (status === 400 || status === 401)
+        throw new Error(
+          `Microsoft rejected the credentials (${status}). Check the tenant ID and client ID, and that the secret VALUE (not its ID) was pasted in full and has not expired.`,
+        );
+      if (status === 403)
+        throw new Error(
+          "The credentials work but Microsoft Graph refused to list service principals (403). Grant the app the Directory.Read.All application permission and click 'Grant admin consent'.",
+        );
+      throw err;
+    }
+    log.info("Credentials work.");
+    let out = expandHome(
+      (
+        await rl.question(`Save credentials to [${KEY_DIR}/entra.json]: `)
+      ).trim() || `${KEY_DIR}/entra.json`,
+    );
+    if (existsSync(out) && statSync(out).isDirectory())
+      out = join(out, "entra.json");
+    await confirmOverwrite(rl, out);
+    mkdirSync(dirname(out), { recursive: true });
+    writeFileSync(out, `${JSON.stringify(key, null, 2)}\n`, { mode: 0o600 });
+    console.log(out);
+    log.info(`Scan with: assetloom-app-scanner entra --key ${out}`);
   } finally {
     rl.close();
   }

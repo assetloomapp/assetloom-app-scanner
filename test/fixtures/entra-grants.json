@@ -1,0 +1,41 @@
+[
+  [
+    {
+      "id": "g1",
+      "clientId": "sp1",
+      "consentType": "Principal",
+      "principalId": "u1",
+      "scope": "openid profile Mail.ReadWrite"
+    },
+    {
+      "id": "g2",
+      "clientId": "sp1",
+      "consentType": "Principal",
+      "principalId": "u2",
+      "scope": " openid "
+    }
+  ],
+  [
+    {
+      "id": "g3",
+      "clientId": "sp2",
+      "consentType": "AllPrincipals",
+      "principalId": null,
+      "scope": "User.Read"
+    },
+    {
+      "id": "g4",
+      "clientId": "sp-missing",
+      "consentType": "Principal",
+      "principalId": "u1",
+      "scope": ""
+    },
+    {
+      "id": "g5",
+      "clientId": "sp2",
+      "consentType": "Principal",
+      "principalId": "u-missing",
+      "scope": "Files.Read.All"
+    }
+  ]
+]

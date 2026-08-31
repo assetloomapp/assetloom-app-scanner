@@ -1,0 +1,4 @@
+{
+  "sp1": { "appId": "chatgpt-app-id", "displayName": "ChatGPT" },
+  "sp2": { "appId": "contoso-sync-app-id", "displayName": "Contoso Sync" }
+}

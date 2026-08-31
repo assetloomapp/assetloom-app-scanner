@@ -287,6 +287,54 @@ test("okta scans using the default key file from the home directory", async () =
   }
 });
 
+test("entra without --key and no default key file points at config entra", async () => {
+  const home = mkdtempSync(join(tmpdir(), "no-key-entra-"));
+  try {
+    const res = await runWithInput(["entra"], "", home);
+    assert.equal(res.status, 1);
+    assert.match(res.stderr, /key file not found/);
+    assert.match(res.stderr, /config entra/);
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("entra scans using the default key file from the home directory", async () => {
+  // one server plays both the token endpoint and Microsoft Graph
+  const server = createServer((req, res) => {
+    if (req.method === "POST" && req.url?.endsWith("/oauth2/v2.0/token")) {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end('{"access_token":"tok"}');
+      return;
+    }
+    const ok = req.headers.authorization === "Bearer tok";
+    res.writeHead(ok ? 200 : 401, { "content-type": "application/json" });
+    res.end(ok ? '{"value":[]}' : "{}");
+  });
+  await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  const home = mkdtempSync(join(tmpdir(), "default-key-entra-"));
+  mkdirSync(join(home, ".assetloom-scanner"));
+  writeFileSync(
+    join(home, ".assetloom-scanner", "entra.json"),
+    JSON.stringify({
+      tenant: "t1",
+      clientId: "c1",
+      clientSecret: "s1",
+      loginUrl: base,
+      graphUrl: base,
+    }),
+  );
+  try {
+    const res = await runWithInput(["entra"], "", home);
+    assert.equal(res.status, 0);
+    assert.match(res.stdout, /No third-party app grants found/);
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+    server.close();
+  }
+});
+
 test("okta rejects google-only flags", () => {
   const res = run("okta", "--key", "k.json", "--impersonate", "a@x.com");
   assert.equal(res.status, 1);

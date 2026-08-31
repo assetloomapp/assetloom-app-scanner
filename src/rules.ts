@@ -12,6 +12,25 @@ const HIGH = new Set([
   "https://www.googleapis.com/auth/drive",
   "https://www.googleapis.com/auth/contacts",
   "https://www.googleapis.com/auth/cloud-platform",
+  // Microsoft Graph delegated scopes (Entra), canonical casing
+  "Mail.ReadWrite",
+  "Mail.Send",
+  "MailboxSettings.ReadWrite",
+  "EWS.AccessAsUser.All",
+  "IMAP.AccessAsUser.All",
+  "SMTP.Send",
+  "Files.ReadWrite",
+  "Files.ReadWrite.All",
+  "Sites.ReadWrite.All",
+  "Sites.FullControl.All",
+  "Contacts.ReadWrite",
+  "User.ReadWrite.All",
+  "Group.ReadWrite.All",
+  "Directory.ReadWrite.All",
+  "Directory.AccessAsUser.All",
+  "Application.ReadWrite.All",
+  "AppRoleAssignment.ReadWrite.All",
+  "RoleManagement.ReadWrite.Directory",
 ]);
 
 const HIGH_PREFIXES = ["https://www.googleapis.com/auth/admin."];
@@ -26,6 +45,16 @@ const MEDIUM = new Set([
   "https://www.googleapis.com/auth/spreadsheets",
   "https://www.googleapis.com/auth/documents",
   "https://www.googleapis.com/auth/presentations",
+  // Microsoft Graph delegated scopes (Entra)
+  "Mail.Read",
+  "Files.Read",
+  "Files.Read.All",
+  "Sites.Read.All",
+  "Contacts.Read",
+  "Calendars.ReadWrite",
+  "Directory.Read.All",
+  "User.Read.All",
+  "Group.Read.All",
 ]);
 
 const ORDER: Record<RiskLevel, number> = { low: 0, medium: 1, high: 2 };
