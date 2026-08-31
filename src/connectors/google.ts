@@ -53,7 +53,7 @@ export async function scanDirectory(
   opts: {
     domain?: string;
     concurrency?: number;
-    log?: (msg: string) => void;
+    log?: (msg: string, level?: "info" | "warn") => void;
     progress?: (done: number, total: number, email: string) => void;
   } = {},
 ): Promise<ScanResult> {
@@ -75,7 +75,7 @@ export async function scanDirectory(
         users.push({ id: u.id, email: u.primaryEmail });
     }
     pageToken = res.data.nextPageToken ?? undefined;
-    log(`Fetched ${users.length} users...`);
+    log(`Fetched ${users.length} users...`, "info");
   } while (pageToken);
 
   const grants: Grant[] = [];

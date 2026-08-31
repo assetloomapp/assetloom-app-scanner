@@ -101,7 +101,7 @@ export async function scanOkta(
   client: OktaClient,
   opts: {
     concurrency?: number;
-    log?: (msg: string) => void;
+    log?: (msg: string, level?: "info" | "warn") => void;
     progress?: (done: number, total: number, label: string) => void;
   } = {},
 ): Promise<ScanResult> {
@@ -110,7 +110,7 @@ export async function scanOkta(
     client,
     `/api/v1/apps?limit=200&filter=${encodeURIComponent('status eq "ACTIVE"')}`,
   );
-  log(`Fetched ${apps.length} active apps...`);
+  log(`Fetched ${apps.length} active apps...`, "info");
 
   const usersById = new Map<string, UserRecord>();
   const grants: Grant[] = [];

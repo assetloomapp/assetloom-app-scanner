@@ -227,6 +227,10 @@ function printTable(rows: ReportRow[]): void {
   }
 }
 
+// connectors report progress at "info" and per-item failures at "warn"
+const scanLog = (msg: string, level?: "info" | "warn"): void =>
+  log[level ?? "warn"](msg);
+
 function keyFile(v: Values, command: string, hint: string): string {
   const key = expandHome(v.key as string);
   if (!existsSync(key)) fail(`key file not found: ${key} — ${hint}`, command);
@@ -244,7 +248,7 @@ async function googleCmd(v: Values): Promise<void> {
   log.info(`Fetching users from Google Workspace as ${v.impersonate}...`);
   const result = await scanDirectory(dir, {
     domain: v.domain as string | undefined,
-    log: (msg) => log.warn(msg),
+    log: scanLog,
     progress: v.quiet ? undefined : progressRenderer(),
   });
   report(v, result, "google");
@@ -257,7 +261,7 @@ async function oktaCmd(v: Values): Promise<void> {
   );
   log.info("Fetching apps from Okta...");
   const result = await scanOkta(client, {
-    log: (msg) => log.warn(msg),
+    log: scanLog,
     progress: v.quiet ? undefined : progressRenderer(),
   });
   report(v, result, "okta");
